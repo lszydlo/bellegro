@@ -1,6 +1,13 @@
 package com.bottega.bellegro.bidder.domain;
 
-import java.math.BigDecimal;
+import com.bottega.bellegro.DomainEvent;
+import com.bottega.bellegro.bidder.domain.consumes.DoActivateAuction;
+import com.bottega.bellegro.bidder.domain.consumes.DoCreateAuction;
+import com.bottega.bellegro.bidder.domain.ports.CurrentUser;
+import com.bottega.bellegro.bidder.domain.ports.Seller;
+import com.bottega.bellegro.bidder.domain.produces.AuctionWasActivated;
+import com.bottega.bellegro.bidder.domain.produces.AuctionWasCreated;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,12 +19,20 @@ public class BidderService {
 	private CurrentUser currentUser;
 	private AuctionsRepo repo;
 
-	// cena większa od 0
 	public void handle(DoCreateAuction command) {
-		currentUser.isSeller();
-		Auctions auctions = repo.load(command.getProductId());
-		auctions.addAuction(command);
-		repo.save(auctions);
+		repo.accept(command.getProductId(),
+				auctions -> {
+					currentUser.isSeller();
+					auctions.addAuction(command);
+				});
+	}
+
+	public void handle(DoActivateAuction command) {
+		repo.accept(AuctionId.of(command.getAuctionId()),
+				auction -> {
+					Seller seller = currentUser.getSeller();
+					auction.activate(seller);
+				});
 	}
 
 	class Auctions {
@@ -26,25 +41,35 @@ public class BidderService {
 
 		void addAuction(DoCreateAuction command) {
 			// FIXME:
-			if (auctions.stream()
-					.anyMatch(auction -> auction.isActive() || auction.hasId(command.getAuctionId()))) {
+			if (auctions.stream().anyMatch(Auction::isActive)) {
 				throw new RuntimeException("active auction exists");
+			} else if (auctions.stream().anyMatch(auction -> auction.hasId(command.getAuctionId()))) {
+				throw new RuntimeException("auction already exists");
 			} else {
-				auctions.add(new Auction(command.getAuctionId(),command.getEndDate(), Money.of(command.getMinPrice())));
+				auctions.add(new Auction(
+						AuctionId.of(command.getAuctionId()),
+						command.getEndDate(),
+						Money.of(command.getMinPrice())));
 			}
 		}
 	}
 
-	private class Auction {
-		private final UUID auctionId;
+	class Auction {
+
+		private List<DomainEvent> events = new ArrayList<>();
+
+		private final AuctionId auctionId;
 		private final LocalDateTime endDate;
 		private final Money minPrice;
 		private boolean isActive;
+		private UUID ownerId;
 
-		Auction(UUID auctionId, LocalDateTime endDate, Money minPrice) {
+		Auction(AuctionId auctionId, LocalDateTime endDate, Money minPrice) {
 			this.auctionId = auctionId;
 			this.endDate = endDate;
 			this.minPrice = minPrice;
+			this.isActive = false;
+			events.add(new AuctionWasCreated(endDate, minPrice.value(), auctionId));
 		}
 
 		boolean isActive() {
@@ -54,5 +79,15 @@ public class BidderService {
 		boolean hasId(UUID auctionId) {
 			return this.auctionId.equals(auctionId);
 		}
+
+		void activate(Seller seller) {
+			if (seller.hasId(ownerId)) {
+				this.isActive = true;
+				events.add(new AuctionWasActivated(auctionId));
+			} else {
+				throw new RuntimeException();
+			}
+		}
 	}
+
 }

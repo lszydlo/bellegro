@@ -1,13 +1,10 @@
 package com.bottega.bellegro.bidder.infra;
 
 import com.bottega.bellegro.bidder.domain.BidderService;
-import com.bottega.bellegro.bidder.domain.DoCreateAuction;
+import com.bottega.bellegro.bidder.domain.consumes.DoCreateAuction;
 import lombok.AllArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.util.UUID;
@@ -25,4 +22,5 @@ public class BidderController {
 
 		return ResponseEntity.created(builder.build().toUri()).build();
 	}
+
 }

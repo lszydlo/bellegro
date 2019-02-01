@@ -1,4 +1,4 @@
-package com.bottega.bellegro.bidder.domain;
+package com.bottega.bellegro.bidder.domain.consumes;
 
 
 import lombok.Data;
